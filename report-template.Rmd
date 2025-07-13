@@ -1,0 +1,132 @@
+---
+title: "Laporan Analisis Regresi UHI"
+output: 
+  pdf_document:
+    keep_tex: true
+params:
+  model_object: NULL 
+  use_robust_se: FALSE
+  glance_df: NULL
+  diagnostic_plot: NULL
+  selected_year: NULL
+  selected_vars: NULL
+  transform_y: NULL
+---
+
+```{r setup, include=FALSE}
+# Pengaturan global untuk semua blok kode R di laporan ini
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(ggplot2)
+library(knitr)
+library(lmtest)
+library(car)
+library(sandwich)
+library(broom)
+```
+
+### Laporan Analisis Regresi - Urban Heat Island
+
+Laporan ini dibuat secara otomatis dari Dasbor UHI pada tanggal **`r format(Sys.time(), '%d %B %Y')`**.
+
+* **Tahun Analisis:** `r params$selected_year`
+* **Variabel yang Digunakan:** `r paste(params$selected_vars, collapse = ", ")`
+* **Transformasi Suhu (Y):** `r params$transform_y`
+* **Menggunakan Robust Standard Errors:** `r ifelse(params$use_robust_se, 'Ya', 'Tidak')`
+
+---
+
+### 1. Ringkasan Model
+
+Berikut adalah ringkasan dari model regresi yang telah dibangun.
+
+```{r model-summary}
+# PERUBAHAN: Logika ringkasan sekarang ada di dalam Rmd
+# Ini jauh lebih aman daripada mengirim teks.
+if (params$use_robust_se) {
+  # Menampilkan hasil dengan Robust SE
+  coeftest(params$model_object, vcov. = vcovHC(params$model_object, type = "HC1"))
+} else {
+  # Menampilkan hasil standar OLS
+  summary(params$model_object)
+}
+```
+
+**Persamaan Regresi:**
+
+```{r model-equation, results='asis'}
+# PERUBAHAN: Membuat persamaan langsung di sini
+model <- params$model_object
+y_name <- if (params$transform_y == "log") "log(suhu)" else if (params$transform_y == "sqrt") "sqrt(suhu)" else "suhu"
+tidy_model <- tidy(model)
+eq <- paste0(y_name, " = ", round(tidy_model$estimate[1], 4))
+predictors <- tidy_model %>% filter(term != "(Intercept)")
+if (nrow(predictors) > 0) {
+  for (i in 1:nrow(predictors)) {
+    term <- predictors$term[i]
+    estimate <- round(predictors$estimate[i], 4)
+    # Ganti '_' dengan '\_' untuk LaTeX
+    term <- gsub("_", "\\\\_", term, fixed = TRUE)
+    sign <- ifelse(estimate >= 0, " + ", " - ")
+    eq <- paste0(eq, sign, abs(estimate), " * ", term)
+  }
+}
+cat(paste0("`", eq, "`"))
+```
+
+---
+
+### 2. Evaluasi Model
+
+Tabel di bawah ini menunjukkan metrik kesesuaian model secara keseluruhan.
+
+```{r glance-table}
+kable(params$glance_df, caption = "Statistik Kesesuaian Model", digits = 3)
+```
+
+---
+
+### 3. Uji Asumsi Klasik
+
+Berikut adalah hasil dari uji statistik inferensia untuk memeriksa asumsi-asumsi klasik regresi.
+
+```{r assumption-tests, comment=""}
+# PERUBAHAN: Menjalankan semua tes langsung di sini
+model <- params$model_object
+cat("--- 1. Uji Normalitas Residual (Kolmogorov-Smirnov) ---\n")
+tryCatch({
+    ks_test <- ks.test(rstandard(model), "pnorm")
+    print(ks_test)
+}, error = function(e) cat("ERROR:", e$message))
+
+cat("\n-- 2. Uji Homoskedastisitas (Breusch-Pagan) --\n")
+tryCatch({
+    print(bptest(model))
+}, error = function(e) cat("ERROR:", e$message))
+
+cat("\n--- 3. Uji Autokorelasi (Durbin-Watson) ---\n")
+tryCatch({
+    print(dwtest(model))
+}, error = function(e) cat("ERROR:", e$message))
+
+cat("\n--- 4. Uji Multikolinearitas (VIF) ---\n")
+tryCatch({
+    if (length(all.vars(formula(model))[-1]) > 1) {
+        print(vif(model))
+    } else {
+        cat("VIF tidak dapat dihitung (hanya 1 prediktor).\n")
+    }
+}, error = function(e) cat("ERROR:", e$message))
+```
+
+---
+
+### 4. Plot Diagnostik
+
+Plot di bawah ini digunakan untuk memeriksa asumsi secara visual.
+
+```{r diagnostic-plot, fig.cap="Plot Diagnostik Model Regresi"}
+print(params$diagnostic_plot)
+```
+
+---
+*Akhir dari Laporan*

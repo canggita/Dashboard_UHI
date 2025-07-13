@@ -1,0 +1,13 @@
+name: UHI_Dashboard
+title: UHI_Dashboard
+username: anggimeylani
+account: anggimeylani
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15035160
+bundleId: 10609006
+url: https://anggimeylani.shinyapps.io/UHI_Dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: App_.R|tempCodeRunnerFile.R
